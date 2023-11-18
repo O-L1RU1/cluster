@@ -1,5 +1,9 @@
-altair
 numpy
-pandas
 pydeck
-streamlit
+altair<5
+scikit-learn
+scipy
+sentence-transformers
+pandas
+datasets
+openai
