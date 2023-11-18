@@ -13,39 +13,75 @@
 # limitations under the License.
 
 import streamlit as st
+import pandas as pd
+import numpy as np
 from streamlit.logger import get_logger
+from io import StringIO
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
+from openai import OpenAI
+client = OpenAI(
+    api_key="sb-e9ae4143b05d6472fcc2bac178629cfef28aafd023e7413c",
+    base_url="https://api.openai-sb.com/v1/",)
+
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+
+def greet(my_string,num_clusters):
+
+    sentence_list = my_string.split(",")
+    cleaned_list = [sentence.strip("'") for sentence in sentence_list]
+    # print(cleaned_list)
+    corpus_embeddings = embedder.encode(cleaned_list)
+
+# Perform kmean clustering
+    clustering_model = KMeans(n_clusters=num_clusters)
+    clustering_model.fit(corpus_embeddings)
+    cluster_assignment = clustering_model.labels_
+
+    clustered_sentences = [[] for i in range(num_clusters)]
+    for sentence_id, cluster_id in enumerate(cluster_assignment):
+        clustered_sentences[cluster_id].append(cleaned_list[sentence_id])
+
+
+    output = StringIO()
+    for i, cluster in enumerate(clustered_sentences):
+      print("Cluster ", i+1, "数量为", len(cluster),file=output)
+      print("\n", file=output)
+      
+      print(cluster, file=output)
+      completion = client.chat.completions.create(
+          model="gpt-3.5-turbo",
+          messages=[
+              {"role": "user", "content": "请你提取这些句子集合所表达的共同观点:"+str(cluster)},
+  ]
+)
+      print("\n\n\n", file=output) 
+      print("key idea:", file=output) 
+      print(completion.choices[0].message.content, file=output)
+      print("", file=output)
+    result_string = output.getvalue()
+    output.close()
+    # result_string
+    # print(result_string)
+    return str(result_string)
+
 
 LOGGER = get_logger(__name__)
-
 
 def run():
     st.set_page_config(
         page_title="Hello",
         page_icon="👋",
     )
+    st.write('注意文本的输入格式，示例如下：')
+    title = st.text_input( "'A man is eating food.','A man is eating a piece of bread.','A man is eating pasta.'")
+    # st.write('your input is:', title)
+    number = int(st.number_input('输入簇的数量',value=1))
+    # st.write('输入簇的数量:', number)
+    st.write("# 得到聚类结果和观点! 🤗")
 
-    st.write("# Welcome to Streamlit! 👋")
-
-    st.sidebar.success("Select a demo above.")
-
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
-    """
-    )
-
+    a=greet(title,number)
+    st.write(a)
 
 if __name__ == "__main__":
     run()
